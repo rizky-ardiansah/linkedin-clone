@@ -34,8 +34,8 @@ export const signup = async (req, res) => {
         const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "3d" });
 
         res.cookie("jwt-linkedin", token, {
-            httpOnly: true, //prevent xss attack in the browser
-            maxAge: 3 * 24 * 60 * 60 * 1000, //3 days
+            httpOnly: true, // mencegah serangan xss
+            maxAge: 3 * 24 * 60 * 60 * 1000, //3 hari
             sameSite: "strict",
             secure: process.env.NODE_ENV === "production", // Prevents man in the middle attack
         });
@@ -55,8 +55,47 @@ export const signup = async (req, res) => {
     }
 }
 export const login = async (req, res) => {
-    res.send('Login route');
+    try {
+        const { username, password } = req.body;
+        const user = await User.findOne({ username });
+
+        // cek apakah user ada
+        if (!user) {
+            return res.status(400).json({ message: "Invalid credentials" });
+        }
+
+        // cek apakah password benar
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ message: "Invalid credentials" });
+        }
+
+        // buat token
+        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "3d" });
+
+        res.cookie("jwt-linkedin", token, {
+            httpOnly: true, // mencegah serangan xss
+            maxAge: 3 * 24 * 60 * 60 * 1000, //3 hari
+            sameSite: "strict",
+            secure: process.env.NODE_ENV === "production", // Prevents man in the middle attack
+        });
+
+        res.json({ message: "Logged in successfully" });
+    } catch (error) {
+        console.error("Login error: ", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
 }
 export const logout = async (req, res) => {
-    res.send('Logout route');
+    res.clearCookie("jwt-linkedin");
+    res.json({ message: "User logged out" });
+}
+
+export const getCurrentUser = async (req, res) => {
+    try {
+        res.json(req.user);
+    } catch (error) {
+        console.error("Get current user error: ", error);
+        res.status(500).json({ message: "Server error" });
+    }
 }
