@@ -1,4 +1,5 @@
-import User from "../models/user.model"
+import User from "../models/user.model.js";
+import cloudinary from "../lib/cloudinary.js";
 
 export const getSuggestedConnections = async (req, res) => {
     try {
@@ -51,7 +52,23 @@ export const updateProfile = async (req, res) => {
                 updatedData[field] = req.body[field]
             }
         }
-    } catch (error) {
 
+        if (req.body.profilePicture) {
+            const result = await cloudinary.uploader.upload(req.body.profilePicture)
+            updatedData.profilePicture = result.secure_url
+        }
+
+        if (req.body.bannerImg) {
+            const result = await cloudinary.uploader.upload(req.body.banner)
+            updatedData.profilePicture = result.secure_url
+        }
+
+        // Check for the profile picture and banner image
+        const user = await User.findByIdAndUpdate(req.user._id, { $set: updatedData }, { new: true }).select("-password")
+
+        res.json(user)
+    } catch (error) {
+        console.error("Update profile error: ", error)
+        res.status(500).json({ message: "Internal server error" })
     }
 }

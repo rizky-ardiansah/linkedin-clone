@@ -31,7 +31,7 @@ export const signup = async (req, res) => {
                 username,
             });
         await user.save();
-        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "3d" });
+        const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "3d" });
 
         res.cookie("jwt-linkedin", token, {
             httpOnly: true, // mencegah serangan xss
