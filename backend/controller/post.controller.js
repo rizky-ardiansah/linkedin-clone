@@ -1,5 +1,6 @@
 import cloudinary from '../lib/cloudinary.js';
 import Post from '../models/post.model.js';
+import { sendCommentNotificationEmail } from '../emails/emailHandlers.js';
 
 export const getFeedposts = async (req, res) => {
     try {
@@ -93,15 +94,61 @@ export const createComment = async (req, res) => {
         const postId = req.params.id
         const { content } = req.body
 
-        const post = await Post.findById(postId, {
+        const post = await Post.findByIdAndUpdate(postId, {
             $push: { comments: { user: req.user._id, content } },
         }, { new: true }
         ).populate("author", "name email username headline profilePicture")
 
         // create notification
+        if (post.author._id.toString() !== req.user._id.toString()) {
+            const newNotification = new Notification({
+                recepient: post.author,
+                relatedUser: req.user._id,
+                relatedPost: postId,
+            })
+            await newNotification.save()
+            try {
+                const postURL = process.env.CLIENT_URL + "/post/" + postId
+                await sendCommentNotificationEmail(post.author.email, post.author.name, req.user.name, postURL, content)
+            } catch (error) {
+                console.error("Error sending notification email: ", error)
+
+            }
+        }
+        res.status(201).json(post)
 
     } catch (error) {
         console.error("Create comment error: ", error)
+        res.status(500).json({ message: "server error" })
+    }
+}
+
+export const likePost = async (req, res) => {
+    try {
+        const postId = req.params.id
+        const post = await Post.findById(postId)
+        const userId = req.user._id
+
+        if (post.likes.includes(userId)) {
+            // unlike post
+            post.likes = post.likes.filter(id => id.toString() !== userId.toString())
+        } else {
+            // like post
+            post.likes.push(userId)
+            // notification
+            if (post.author.toString() !== userId.toString()) {
+                const newNotification = new Notification({
+                    recepient: post.author,
+                    relatedUser: userId,
+                    relatedPost: postId,
+                })
+                await newNotification.save()
+            }
+        }
+        post.save()
+        res.status(200).json(post)
+    } catch (error) {
+        console.error("Like post error: ", error)
         res.status(500).json({ message: "server error" })
     }
 }
